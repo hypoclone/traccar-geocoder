@@ -96,29 +96,29 @@ struct GeoCellOffsets {
     interp: u32,
 }
 
-fn mmap_file(path: &str) -> Mmap {
-    let file = File::open(path).unwrap_or_else(|e| panic!("Failed to open {}: {}", path, e));
-    unsafe { Mmap::map(&file).unwrap_or_else(|e| panic!("Failed to mmap {}: {}", path, e)) }
+fn mmap_file(path: &str) -> Result<Mmap, String> {
+    let file = File::open(path).map_err(|e| format!("Failed to open {}: {}", path, e))?;
+    unsafe { Mmap::map(&file).map_err(|e| format!("Failed to mmap {}: {}", path, e)) }
 }
 
 impl Index {
-    fn load(dir: &str) -> Self {
-        Index {
-            geo_cells: mmap_file(&format!("{}/geo_cells.bin", dir)),
-            street_entries: mmap_file(&format!("{}/street_entries.bin", dir)),
-            street_ways: mmap_file(&format!("{}/street_ways.bin", dir)),
-            street_nodes: mmap_file(&format!("{}/street_nodes.bin", dir)),
-            addr_entries: mmap_file(&format!("{}/addr_entries.bin", dir)),
-            addr_points: mmap_file(&format!("{}/addr_points.bin", dir)),
-            interp_entries: mmap_file(&format!("{}/interp_entries.bin", dir)),
-            interp_ways: mmap_file(&format!("{}/interp_ways.bin", dir)),
-            interp_nodes: mmap_file(&format!("{}/interp_nodes.bin", dir)),
-            admin_cells: mmap_file(&format!("{}/admin_cells.bin", dir)),
-            admin_entries: mmap_file(&format!("{}/admin_entries.bin", dir)),
-            admin_polygons: mmap_file(&format!("{}/admin_polygons.bin", dir)),
-            admin_vertices: mmap_file(&format!("{}/admin_vertices.bin", dir)),
-            strings: mmap_file(&format!("{}/strings.bin", dir)),
-        }
+    fn load(dir: &str) -> Result<Self, String> {
+        Ok(Index {
+            geo_cells: mmap_file(&format!("{}/geo_cells.bin", dir))?,
+            street_entries: mmap_file(&format!("{}/street_entries.bin", dir))?,
+            street_ways: mmap_file(&format!("{}/street_ways.bin", dir))?,
+            street_nodes: mmap_file(&format!("{}/street_nodes.bin", dir))?,
+            addr_entries: mmap_file(&format!("{}/addr_entries.bin", dir))?,
+            addr_points: mmap_file(&format!("{}/addr_points.bin", dir))?,
+            interp_entries: mmap_file(&format!("{}/interp_entries.bin", dir))?,
+            interp_ways: mmap_file(&format!("{}/interp_ways.bin", dir))?,
+            interp_nodes: mmap_file(&format!("{}/interp_nodes.bin", dir))?,
+            admin_cells: mmap_file(&format!("{}/admin_cells.bin", dir))?,
+            admin_entries: mmap_file(&format!("{}/admin_entries.bin", dir))?,
+            admin_polygons: mmap_file(&format!("{}/admin_polygons.bin", dir))?,
+            admin_vertices: mmap_file(&format!("{}/admin_vertices.bin", dir))?,
+            strings: mmap_file(&format!("{}/strings.bin", dir))?,
+        })
     }
 
     fn get_string(&self, offset: u32) -> &str {
@@ -450,6 +450,7 @@ impl Index {
                     street: Some(self.get_string(point.street_id)),
                     city: admin.city,
                     state: admin.state,
+                    county: admin.county,
                     postcode: admin.postcode,
                     country: admin.country,
                 };
@@ -464,6 +465,7 @@ impl Index {
                     street: Some(street_name),
                     city: admin.city,
                     state: admin.state,
+                    county: admin.county,
                     postcode: admin.postcode,
                     country: admin.country,
                 };
@@ -478,6 +480,7 @@ impl Index {
                     street: Some(self.get_string(way.name_id)),
                     city: admin.city,
                     state: admin.state,
+                    county: admin.county,
                     postcode: admin.postcode,
                     country: admin.country,
                 };
@@ -491,6 +494,7 @@ impl Index {
                 street: None,
                 city: admin.city,
                 state: admin.state,
+                county: admin.county,
                 postcode: admin.postcode,
                 country: admin.country,
             };
@@ -581,6 +585,8 @@ struct Address<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     state: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    county: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     postcode: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     country: Option<&'a str>,
@@ -608,7 +614,13 @@ async fn main() {
     let bind_addr = args.get(2).map(|s| s.as_str()).unwrap_or("0.0.0.0:3000");
 
     eprintln!("Loading index from {}...", data_dir);
-    let index = Arc::new(Index::load(data_dir));
+    let index = match Index::load(data_dir) {
+        Ok(idx) => Arc::new(idx),
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    };
     eprintln!("Index loaded. Starting server on {}...", bind_addr);
 
     let app = Router::new()
