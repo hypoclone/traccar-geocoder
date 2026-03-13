@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Geocoder</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>td { word-break: break-all; } td:last-child { width: 1%; white-space: nowrap; } td form, td button { margin: 0; width: auto; }</style>
+</head>
+<body>
+  <main class="container">
+    <nav>
+      <ul></ul>
+      <ul><li><a href="/logout">Sign out</a></li></ul>
+    </nav>
+    <article>
+      <form method="post" action="/tokens">
+        <button type="submit" class="outline">Create Token</button>
+      </form>
+      <table>
+        <thead><tr><th>Token</th><th></th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </article>
+  </main>
+</body>
+</html>

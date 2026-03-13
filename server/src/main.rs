@@ -1,11 +1,17 @@
-use axum::{extract::Query, routing::get, Router};
+mod auth;
+
+use axum::extract::Query;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
+use axum::Router;
 use memmap2::Mmap;
 use s2::cellid::CellID;
 use s2::latlng::LatLng;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fs::File;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 // --- S2 helpers ---
 
@@ -684,21 +690,35 @@ fn format_address(addr: &AddressDetails<'_>) -> Option<String> {
 struct QueryParams {
     lat: f64,
     lon: f64,
+    key: Option<String>,
 }
 
 async fn reverse_geocode(
     Query(params): Query<QueryParams>,
-    index: axum::extract::State<Arc<Index>>,
-) -> ([(axum::http::header::HeaderName, &'static str); 1], String) {
+    state: axum::extract::State<Arc<RwLock<auth::Db>>>,
+    index: axum::extract::Extension<Arc<Index>>,
+) -> Response {
+    let key = match params.key {
+        Some(k) => k,
+        None => return (StatusCode::UNAUTHORIZED, "Missing API key").into_response(),
+    };
+
+    if !state.read().unwrap().validate_token(&key) {
+        return (StatusCode::UNAUTHORIZED, "Invalid API key").into_response();
+    }
+
     let address = index.query(params.lat, params.lon);
     let json = serde_json::to_string(&address).unwrap_or_default();
-    ([(axum::http::header::CONTENT_TYPE, "application/json")], json)
+    ([(axum::http::header::CONTENT_TYPE, "application/json")], json).into_response()
 }
 
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
     let data_dir = args.get(1).map(|s| s.as_str()).unwrap_or(".");
+
+    let db_path = format!("{}/geocoder.json", data_dir);
+    let db = auth::Db::load(&db_path);
 
     eprintln!("Loading index from {}...", data_dir);
     let index = match Index::load(data_dir) {
@@ -709,9 +729,13 @@ async fn main() {
         }
     };
 
+    let db = Arc::new(RwLock::new(db));
+
     let app = Router::new()
         .route("/reverse", get(reverse_geocode))
-        .with_state(index);
+        .layer(axum::Extension(index))
+        .merge(auth::router())
+        .with_state(db);
 
     // ACME mode: --domain <domain> [--cache <dir>]
     let domain_pos = args.iter().position(|a| a == "--domain");
