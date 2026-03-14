@@ -26,8 +26,11 @@ build_index() {
         exit 1
     fi
     mkdir -p "$DATA_DIR/index"
+    level_args=""
+    [ -n "$STREET_LEVEL" ] && level_args="$level_args --street-level $STREET_LEVEL"
+    [ -n "$ADMIN_LEVEL" ] && level_args="$level_args --admin-level $ADMIN_LEVEL"
     echo "Building index..."
-    build-index "$DATA_DIR/index" $files
+    build-index "$DATA_DIR/index" $files $level_args
     echo "Index built."
 }
 
@@ -41,6 +44,8 @@ serve() {
     else
         args="$args ${BIND_ADDR:-0.0.0.0:3000}"
     fi
+    [ -n "$STREET_LEVEL" ] && args="$args --street-level $STREET_LEVEL"
+    [ -n "$ADMIN_LEVEL" ] && args="$args --admin-level $ADMIN_LEVEL"
     echo "Starting server..."
     exec query-server $args
 }

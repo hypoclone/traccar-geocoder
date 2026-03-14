@@ -115,8 +115,8 @@ static std::unordered_map<uint64_t, std::vector<uint32_t>> cell_to_admin;
 
 // --- S2 helpers ---
 
-static const int kStreetCellLevel = 17;
-static const int kAdminCellLevel = 10;
+static int kStreetCellLevel = 17;
+static int kAdminCellLevel = 10;
 
 static std::vector<S2CellId> cover_edge(double lat1, double lng1, double lat2, double lng2) {
     S2Point p1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
@@ -809,20 +809,29 @@ static void write_index(const std::string& output_dir) {
         f.write(strings.data().data(), strings.data().size());
         std::cerr << "strings.bin: " << strings.data().size() << " bytes" << std::endl;
     }
+
+
 }
 
 // --- Main ---
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cerr << "Usage: build-index <output-dir> <input.osm.pbf> [input2.osm.pbf ...]" << std::endl;
+        std::cerr << "Usage: build-index <output-dir> <input.osm.pbf> [input2.osm.pbf ...] [--street-level N] [--admin-level N]" << std::endl;
         return 1;
     }
 
     std::string output_dir = argv[1];
     std::vector<std::string> input_files;
     for (int i = 2; i < argc; i++) {
-        input_files.push_back(argv[i]);
+        std::string arg = argv[i];
+        if (arg == "--street-level" && i + 1 < argc) {
+            kStreetCellLevel = std::atoi(argv[++i]);
+        } else if (arg == "--admin-level" && i + 1 < argc) {
+            kAdminCellLevel = std::atoi(argv[++i]);
+        } else {
+            input_files.push_back(arg);
+        }
     }
 
     BuildHandler handler;

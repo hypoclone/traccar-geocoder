@@ -15,8 +15,8 @@ use std::sync::{Arc, RwLock};
 
 // --- S2 helpers ---
 
-const STREET_CELL_LEVEL: u64 = 17;
-const ADMIN_CELL_LEVEL: u64 = 10;
+const DEFAULT_STREET_CELL_LEVEL: u64 = 17;
+const DEFAULT_ADMIN_CELL_LEVEL: u64 = 10;
 
 fn cell_id_at_level(lat: f64, lng: f64, level: u64) -> u64 {
     let ll = LatLng::from_degrees(lat, lng);
@@ -93,6 +93,8 @@ struct Index {
     admin_polygons: Mmap,
     admin_vertices: Mmap,
     strings: Mmap,
+    street_cell_level: u64,
+    admin_cell_level: u64,
 }
 
 const NO_DATA: u32 = 0xFFFFFFFF;
@@ -109,7 +111,7 @@ fn mmap_file(path: &str) -> Result<Mmap, String> {
 }
 
 impl Index {
-    fn load(dir: &str) -> Result<Self, String> {
+    fn load(dir: &str, street_cell_level: u64, admin_cell_level: u64) -> Result<Self, String> {
         Ok(Index {
             geo_cells: mmap_file(&format!("{}/geo_cells.bin", dir))?,
             street_entries: mmap_file(&format!("{}/street_entries.bin", dir))?,
@@ -125,6 +127,8 @@ impl Index {
             admin_polygons: mmap_file(&format!("{}/admin_polygons.bin", dir))?,
             admin_vertices: mmap_file(&format!("{}/admin_vertices.bin", dir))?,
             strings: mmap_file(&format!("{}/strings.bin", dir))?,
+            street_cell_level,
+            admin_cell_level,
         })
     }
 
@@ -213,8 +217,8 @@ impl Index {
     // --- Geo lookup (streets, addresses, interpolation from merged index) ---
 
     fn query_geo(&self, lat: f64, lng: f64) -> (Option<(f64, &AddrPoint)>, Option<(f64, &str, u32)>, Option<(f64, &WayHeader)>) {
-        let cell = cell_id_at_level(lat, lng, STREET_CELL_LEVEL);
-        let neighbors = cell_neighbors_at_level(cell, STREET_CELL_LEVEL);
+        let cell = cell_id_at_level(lat, lng, self.street_cell_level);
+        let neighbors = cell_neighbors_at_level(cell, self.street_cell_level);
 
         let all_points: &[AddrPoint] = unsafe {
             std::slice::from_raw_parts(
@@ -375,8 +379,8 @@ impl Index {
     // --- Admin boundary lookup (point-in-polygon) ---
 
     fn find_admin(&self, lat: f64, lng: f64) -> AdminResult<'_> {
-        let cell = cell_id_at_level(lat, lng, ADMIN_CELL_LEVEL);
-        let neighbors = cell_neighbors_at_level(cell, ADMIN_CELL_LEVEL);
+        let cell = cell_id_at_level(lat, lng, self.admin_cell_level);
+        let neighbors = cell_neighbors_at_level(cell, self.admin_cell_level);
 
         let all_polygons: &[AdminPolygon] = unsafe {
             std::slice::from_raw_parts(
@@ -730,11 +734,20 @@ async fn main() {
     let args: Vec<String> = std::env::args().collect();
     let data_dir = args.get(1).map(|s| s.as_str()).unwrap_or(".");
 
+    let parse_arg = |flag: &str, default: u64| -> u64 {
+        args.iter().position(|a| a == flag)
+            .and_then(|p| args.get(p + 1))
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default)
+    };
+    let street_cell_level = parse_arg("--street-level", DEFAULT_STREET_CELL_LEVEL);
+    let admin_cell_level = parse_arg("--admin-level", DEFAULT_ADMIN_CELL_LEVEL);
+
     let db_path = format!("{}/geocoder.json", data_dir);
     let db = auth::Db::load(&db_path);
 
     eprintln!("Loading index from {}...", data_dir);
-    let index = match Index::load(data_dir) {
+    let index = match Index::load(data_dir, street_cell_level, admin_cell_level) {
         Ok(idx) => Arc::new(idx),
         Err(e) => {
             eprintln!("Error: {}", e);
