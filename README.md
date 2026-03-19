@@ -55,7 +55,7 @@ docker run -e PBF_URLS="https://download.geofabrik.de/europe/france-latest.osm.p
   -v geocoder-data:/data -p 3000:3000 traccar/traccar-geocoder
 
 # With automatic HTTPS
-docker run -e PBF_URLS="https://download.geofabrik.de/planet-latest.osm.pbf" \
+docker run -e PBF_URLS="https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf" \
   -e DOMAIN=geocoder.example.com \
   -v geocoder-data:/data -p 443:443 traccar/traccar-geocoder
 ```
