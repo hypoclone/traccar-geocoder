@@ -178,9 +178,9 @@ The builder produces 14 binary files:
 ### Prerequisites
 
 **Builder (C++):**
-- CMake 3.16+
+- CMake 3.22+
 - C++17 compiler
-- libosmium, protozero, s2geometry, zlib, bzip2, expat
+- libosmium, protozero, zlib, bzip2, expat
 
 **Server (Rust):**
 - Rust toolchain
