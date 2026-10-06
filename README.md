@@ -62,7 +62,9 @@ docker run -e PBF_URLS="https://planet.openstreetmap.org/pbf/planet-latest.osm.p
 
 PBF files can be downloaded from [Geofabrik](https://download.geofabrik.de/).
 
-The full earth index will take up around 18gb of disk space, so for high performance you want a machine with at least 16gb ram, or fast NVME storage.
+We also provide a [ready-to-use index](https://traccar.nyc3.digitaloceanspaces.com/download/index.tar.gz) so you can skip building the index yourself.
+
+The full earth index will take up around 21 GB of disk space, so for high performance you want a machine with at least 16gb ram, or fast NVME storage.
 
 ## API
 
