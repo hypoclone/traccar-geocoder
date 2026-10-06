@@ -43,6 +43,14 @@
         <tbody>{user_rows}</tbody>
       </table>
     </article>
+    <details>
+      <summary>Change password</summary>
+      <form method="post" action="/password">
+        <input type="password" name="current_password" placeholder="Current password" autocomplete="current-password" required>
+        <input type="password" name="new_password" placeholder="New password" autocomplete="new-password" required>
+        <button type="submit">Change password</button>
+      </form>
+    </details>
   </main>
 </body>
 </html>

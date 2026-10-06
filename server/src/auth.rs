@@ -1,6 +1,7 @@
 use axum::extract::{Form, Path, State};
 use axum::http::header::SET_COOKIE;
 use axum::http::HeaderMap;
+use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::Router;
@@ -158,6 +159,7 @@ pub fn router() -> Router<Arc<RwLock<Db>>> {
         .route("/", get(dashboard))
         .route("/login", get(login_page).post(login_submit))
         .route("/logout", get(logout))
+        .route("/password", post(change_password))
         .route("/tokens", post(create_token))
         .route("/tokens/{token}/delete", get(delete_token))
         .route("/users", post(create_user_handler))
@@ -209,6 +211,25 @@ async fn logout(headers: HeaderMap, state: State<Arc<RwLock<Db>>>) -> Response {
     }
     let (cookie,) = clear_session_cookie();
     (cookie, Redirect::to("/login")).into_response()
+}
+
+#[derive(Deserialize)]
+struct PasswordForm {
+    current_password: String,
+    new_password: String,
+}
+
+async fn change_password(headers: HeaderMap, state: State<Arc<RwLock<Db>>>, Form(form): Form<PasswordForm>) -> Response {
+    let mut db = state.write().unwrap();
+    let login = get_session_cookie(&headers).and_then(|id| db.sessions.get(&id).cloned());
+    if let Some(user) = login.and_then(|login| db.users.get_mut(&login)) {
+        if !form.new_password.is_empty() && bcrypt::verify(&form.current_password, &user.password_hash).unwrap_or(false) {
+            user.password_hash = bcrypt::hash(&form.new_password, bcrypt::DEFAULT_COST).expect("bcrypt hash failed");
+            db.save();
+            return Redirect::to("/").into_response();
+        }
+    }
+    StatusCode::BAD_REQUEST.into_response()
 }
 
 async fn dashboard(
